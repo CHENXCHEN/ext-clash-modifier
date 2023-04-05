@@ -4,13 +4,8 @@ import "./template.js";
 import template from "./template.js";
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     let { pathname } = new URL(request.url);
-
-    if (pathname.startsWith("/p/")) {
-      let filename = pathname.slice(3)
-      return fetch(`https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/${filename}`)
-    }
 
     if (!pathname.startsWith("/m/")) {
       return new Response(`error: invalid parameter`, {
@@ -58,11 +53,20 @@ export default {
       }
     });
 
+    let PROVIDER_PROXY = env.PROVIDER_PROXY;
+    let clashRuleUrl = 'https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/';
     // replace rule provider proxy
     Object.keys(configObj["rule-providers"]).forEach(index => {
       let providerElem = configObj["rule-providers"][index];
-      let providerProxy = 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/'
-      providerElem['url'] = providerElem['url'].replace('_PROVIDER_PROXY|', providerProxy)
+      let providerProxy = typeof PROVIDER_PROXY === 'string' && PROVIDER_PROXY.trim().length > 0 ? PROVIDER_PROXY: new URL(request.url).origin + '/p/'
+      let split = providerElem['url'].split('_PROVIDER_PROXY|')
+      if (split.length === 2) {
+        if (!split[1].startsWith("http")) {
+          providerElem['url'] = PROVIDER_PROXY + clashRuleUrl + split[1];
+        } else {
+          providerElem['url'] = PROVIDER_PROXY + split[1];
+        }
+      }
     });
 
 
