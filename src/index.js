@@ -61,7 +61,7 @@ export default {
     // replace rule provider proxy
     Object.keys(configObj["rule-providers"]).forEach(index => {
       let providerElem = configObj["rule-providers"][index];
-      let providerProxy = new URL(request.url).origin + '/p/'
+      let providerProxy = 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/'
       providerElem['url'] = providerElem['url'].replace('_PROVIDER_PROXY|', providerProxy)
     });
 
