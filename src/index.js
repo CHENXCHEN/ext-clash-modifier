@@ -22,7 +22,13 @@ export default {
 
     let configUrl = Base64.decode(pathname.slice(3));
 
-    let resp = await fetch(configUrl);
+    let resp = await fetch(configUrl, {
+      method: 'GET',
+      headers: {
+        // 如果没有 ua，对于某些产商，不会返回纯文本的 clash yaml 配置，而是会返回加密内容
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.43',
+      }
+    });
     let rawConfig = await resp.text();
     let configObj = yaml.load(rawConfig);
 
