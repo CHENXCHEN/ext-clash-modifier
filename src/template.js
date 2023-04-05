@@ -6,59 +6,65 @@ const remove = ["proxy-groups", "rules", "rule-providers"];
 // 在 Rule Provider 中的 URL 中，使用 `_PROVIDER_PROXY|` 指代规则文件代理 URL
 const append = `
 proxy-groups:
-  - name: 🔯 代理模式
+  - name: 🚀 节点选择
     type: select
     proxies:
-      - 绕过大陆丨黑名单(GFWlist)
-      - 绕过大陆丨白名单(Whitelist)
-  - name: 🔰 选择节点
+      - ♻️ 自动选择
+      - 🔧 手动切换
+      - DIRECT
+  - name: 🔧 手动切换
     type: select
-    proxies: [DIRECT, _PROXY_NAME]
+    proxies: [_PROXY_NAME]
+  - name: ♻️ 自动选择
+    type: url-test
+    url: https://www.google.com
+    interval: 300
+    tolerance: 50
+    proxies: [_PROXY_NAME]
   - name: 🛑 广告拦截
     type: select
     proxies:
-      - DIRECT
       - REJECT
-      - PROXY
-  - name: 绕过大陆丨黑名单(GFWlist)
-    type: url-test
-    url: http://www.gstatic.com/generate_204
-    interval: 86400
+      - 🚀 节点选择
+      - 🔧 手动切换
+      - ♻️ 自动选择
+      - DIRECT
+  - name: 🎯 全球直连
+    type: select
     proxies:
       - DIRECT
-  - name: 绕过大陆丨白名单(Whitelist)
-    type: url-test
-    url: http://www.gstatic.com/generate_204
-    interval: 86400
+      - 🚀 节点选择
+      - 🔧 手动切换
+      - ♻️ 自动选择
+      - REJECT
+  - name: 🐟 漏网之鱼
+    type: select
     proxies:
-      - PROXY
-  - name: PROXY
-    type: url-test
-    url: http://www.gstatic.com/generate_204
-    interval: 86400
-    proxies:
-      - 🔰 选择节点
+      - DIRECT
+      - 🚀 节点选择
+      - 🔧 手动切换
+      - ♻️ 自动选择
 
 rules:
-  - RULE-SET,applications,DIRECT
-  - DOMAIN,clash.razord.top,DIRECT
-  - DOMAIN,yacd.haishan.me,DIRECT
-  - RULE-SET,private,DIRECT
+  - RULE-SET,applications,🎯 全球直连
+  - DOMAIN,clash.razord.top,🎯 全球直连
+  - DOMAIN,yacd.haishan.me,🎯 全球直连
+  - RULE-SET,private,🎯 全球直连
   - RULE-SET,reject,🛑 广告拦截
-  - RULE-SET,icloud,DIRECT
-  - RULE-SET,apple,DIRECT
-  - RULE-SET,google,DIRECT
-  - RULE-SET,tld-not-cn,PROXY
-  - RULE-SET,gfw,PROXY
-  - RULE-SET,greatfire,PROXY
-  - RULE-SET,telegramcidr,PROXY
-  - RULE-SET,lancidr,DIRECT
-  - RULE-SET,cncidr,DIRECT
-  - GEOIP,,DIRECT
-  - GEOIP,CN,DIRECT
-  - RULE-SET,direct,DIRECT
-  - RULE-SET,proxy,🔯 代理模式
-  - MATCH,🔯 代理模式
+  - RULE-SET,icloud,🎯 全球直连
+  - RULE-SET,apple,🎯 全球直连
+  - RULE-SET,google,🎯 全球直连
+  - RULE-SET,tld-not-cn,🚀 节点选择
+  - RULE-SET,gfw,🚀 节点选择
+  - RULE-SET,greatfire,🚀 节点选择
+  - RULE-SET,telegramcidr,🚀 节点选择
+  - RULE-SET,lancidr,🎯 全球直连
+  - RULE-SET,cncidr,🎯 全球直连
+  - GEOIP,,🎯 全球直连
+  - GEOIP,CN,🎯 全球直连
+  - RULE-SET,direct,🎯 全球直连
+  - RULE-SET,proxy,🚀 节点选择
+  - MATCH,🐟 漏网之鱼
 
 rule-providers:
   reject:
