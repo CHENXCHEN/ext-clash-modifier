@@ -1,11 +1,25 @@
-import { Base64 } from "js-base64";
-import yaml from "js-yaml";
-import "./template.js";
-import template from "./template.js";
+import { Base64 } from 'js-base64'
+import yaml from 'js-yaml'
+import './template.js'
+import template from './template.js'
+
+async function fetchText(url, getResp) {
+  let resp = await fetch(url, {
+    method: 'GET',
+    headers: {
+      // 如果没有 ua，对于某些产商，不会返回纯文本的 clash yaml 配置，而是会返回加密内容
+      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.43',
+    }
+  });
+  if (getResp !== null && getResp !== undefined) {
+    getResp(resp);
+  }
+  return await resp.text();
+}
 
 export default {
   async fetch(request, env) {
-    let { pathname } = new URL(request.url);
+    let { pathname, searchParams } = new URL(request.url);
 
     if (!pathname.startsWith("/m/")) {
       return new Response(`error: invalid parameter`, {
@@ -14,17 +28,17 @@ export default {
         },
       });
     }
+    let customUrl = searchParams.get('custom');
+    let customObj = null;
+    if (customUrl !== null && customUrl !== undefined) {
+      customUrl = Base64.decode(customUrl);
+      let customConfig = await fetchText(customUrl);
+      customObj = yaml.load(customConfig);
+    }
 
     let configUrl = Base64.decode(pathname.slice(3));
-
-    let resp = await fetch(configUrl, {
-      method: 'GET',
-      headers: {
-        // 如果没有 ua，对于某些产商，不会返回纯文本的 clash yaml 配置，而是会返回加密内容
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.43',
-      }
-    });
-    let rawConfig = await resp.text();
+    let resp = null;
+    let rawConfig = await fetchText(configUrl, (_resp) => resp = _resp);
     let configObj = yaml.load(rawConfig);
 
     // remove
@@ -69,6 +83,9 @@ export default {
       }
     });
 
+    if (customObj !== null && 'rules' in customObj) {
+      configObj['rules'].unshift(...customObj['rules']);
+    }
 
     let configStr = yaml.dump(configObj);
     return new Response(configStr, {
