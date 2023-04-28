@@ -17,7 +17,7 @@ proxy-groups:
     proxies: [_PROXY_NAME]
   - name: ♻️ 自动选择
     type: url-test
-    url: https://www.google.com
+    url: http://www.google.com/generate_204
     interval: 300
     tolerance: 50
     proxies: [_PROXY_NAME]
