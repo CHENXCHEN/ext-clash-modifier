@@ -109,6 +109,9 @@ export default {
     if (configObj['var']) {
       Object.assign(vars, configObj['var']);
     }
+    if (customObj && customObj['var']) {
+      Object.assign(vars, customObj['var']);
+    }
     if (addObj && addObj['var']) {
       Object.assign(vars, addObj['var']);
     }
