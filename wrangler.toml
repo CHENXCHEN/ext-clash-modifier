@@ -3,4 +3,4 @@ main = "src/index.js"
 compatibility_date = "2022-08-16"
 
 [vars]
-PROVIDER_PROXY = "https://ghproxy.com/"
+PROVIDER_PROXY = "https://ghproxy.org/"
