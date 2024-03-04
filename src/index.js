@@ -57,7 +57,11 @@ export default {
     if (customUrl !== null && customUrl !== undefined) {
       customUrl = Base64.decode(customUrl);
       let customIni = await fetchText(customUrl);
-      customObj = parse(customIni, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
+      try {
+        customObj = parse(customIni, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
+      } catch (e) {
+        console.error(`failed to parse custom config: ${customUrl}`);
+      }
     }
     if (customObj === null || customObj === undefined) {
       customObj = parse(template.defaultIniConfig, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
