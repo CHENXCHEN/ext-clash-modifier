@@ -56,6 +56,9 @@ export default {
     // if custom config is not null
     if (customUrl !== null && customUrl !== undefined) {
       customUrl = Base64.decode(customUrl);
+      let ts = (new Date()).valueOf();
+      if (customUrl.indexOf('?') > 0) customUrl = `${customUrl}&ts=${ts}`
+      else customUrl = `${customUrl}?ts=${ts}`
       let customIni = await fetchText(customUrl);
       try {
         customObj = parse(customIni, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
