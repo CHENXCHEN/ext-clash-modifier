@@ -23,9 +23,9 @@ ruleset=🎯 全球直连,[]GEOIP,LAN
 ruleset=🎯 全球直连,[]GEOIP,CN
 ruleset=🐟 漏网之鱼,[]FINAL
 
+custom_proxy_group=🚀 节点选择\`select\`[]♻️ 自动选择\`[]🔧 手动切换\`[]DIRECT
 custom_proxy_group=♻️ 自动选择\`url-test\`.*\`http://www.google.com/generate_204\`300,5000,50
 custom_proxy_group=🔧 手动切换\`select\`.*
-custom_proxy_group=🚀 节点选择\`select\`[]♻️ 自动选择\`[]🔧 手动切换\`[]DIRECT
 custom_proxy_group=🎯 全球直连\`select\`[]DIRECT\`[]🚀 节点选择\`[]♻️ 自动选择\`[]🔧 手动切换\`[]REJECT
 custom_proxy_group=🛑 广告拦截\`select\`[]REJECT\`[]🚀 节点选择\`[]♻️ 自动选择\`[]🔧 手动切换\`[]DIRECT
 custom_proxy_group=🐟 漏网之鱼\`select\`[]DIRECT\`[]🚀 节点选择\`[]♻️ 自动选择\`[]🔧 手动切换
