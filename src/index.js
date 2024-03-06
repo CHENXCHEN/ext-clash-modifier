@@ -9,7 +9,7 @@ async function fetchText(url, getResp) {
     method: 'GET',
     headers: {
       // 如果没有 ua，对于某些产商，不会返回纯文本的 clash yaml 配置，而是会返回加密内容
-      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.43',
+      'User-Agent': 'Clash',
     }
   });
   if (getResp !== null && getResp !== undefined) {
@@ -91,6 +91,11 @@ export default {
     let configUrl = Base64.decode(pathname.slice(3));
     let resp = null;
     let rawConfig = await fetchText(configUrl, (_resp) => resp = _resp);
+    let respHeaders = {};
+    resp.headers.forEach((vv, kk) => respHeaders[kk] = vv);
+    respHeaders['content-type'] = 'text/plain;charset=utf-8';
+    let removeHeaders = ['content-disposition', 'content-encoding']
+    removeHeaders.forEach((kk) => delete respHeaders[kk]);
     let configObj = yaml.load(rawConfig);
 
     // remove
@@ -184,7 +189,7 @@ export default {
 
     let configStr = yaml.dump(configObj);
     return new Response(configStr, {
-      headers: resp.headers,
+      headers: respHeaders,
     });
   },
 };
