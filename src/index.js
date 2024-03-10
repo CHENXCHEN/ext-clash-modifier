@@ -178,7 +178,7 @@ async function parseAll(subUrls, customerUrl, getResp, env) {
       proxyNames.push(proxyName);
     })
   })
-  allConfigObj['proxies'] = proxies;
+  allConfigObj['proxies'] = Object.values(proxies);
 
   let rules = parseRules(customObj, proxyNames, vars)
   Object.assign(allConfigObj, rules);
