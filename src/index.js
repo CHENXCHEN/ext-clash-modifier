@@ -39,153 +39,186 @@ function templateFormat(str, vars) {
   return str;
 }
 
+async function parseCustom(url) {
+  let customUrl = url;
+  let customObj = null;
+  // if custom config is not null
+  if (customUrl !== null && customUrl !== undefined) {
+    let ts = (new Date()).valueOf();
+    if (customUrl.indexOf('?') > 0) customUrl = `${customUrl}&ts=${ts}`
+    else customUrl = `${customUrl}?ts=${ts}`
+    let customIni = await fetchText(customUrl);
+    try {
+      customObj = parse(customIni,
+        { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
+    } catch (e) {
+      console.error(`failed to parse custom config: ${customUrl}`);
+    }
+  }
+  if (customObj === null || customObj === undefined) {
+    customObj = parse(template.defaultIniConfig, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
+  }
+  return customObj;
+}
+
+async function parseSub(url) {
+  let resp = null;
+  let rawConfig = await fetchText(url, (_resp) => resp = _resp);
+  return [yaml.load(rawConfig), resp];
+}
+
+function parseRules(customObj, proxyNames, vars) {
+  // parse and get rule providers and rules
+  let ruleProviders = {}, rules = [];
+  customObj["custom"]["ruleset"].forEach((rule, idx) => {
+    let split = rule.split(',')
+    if (split.length >= 2) {
+      let groupName = split[0];
+      let clashMatch = split[1].match("clash-((classical)|(ipcidr)|(domain)):")
+      if (clashMatch && clashMatch.length >= 2) {
+        let behavior = clashMatch[1];
+        let provideInterval = Number(split[2]) ? Number(split[2]) : 86400;
+        let provide = split[1].substring(split[1].indexOf(':') + 1);
+        let provideUrl = templateFormat(provide, vars);
+        let match = provideUrl.match(/([^/]*)\.[^.]*$/)
+        let provideName = provideUrl;
+        if (match.length >= 2) {
+          provideName = match[1];
+        } else if (match.length >= 1) {
+          provideName = match[0];
+        }
+        ruleProviders[provideName] = {
+          type: 'http', behavior, url: provideUrl, path: `./ruleset/${provideName}`, interval: provideInterval,
+        }
+        rules.push(`RULE-SET,${provideName},${groupName}`);
+      } else if (split[1] === '[]GEOIP') {
+        let target = split[2];
+        if (target !== undefined && target != null) {
+          rules.push(`GEOIP,${target},${groupName}`)
+        }
+      } else if (split[1] === '[]FINAL') {
+        rules.push(`MATCH,${groupName}`)
+      }
+    }
+  });
+
+  let proxyGroup = [];
+  customObj['custom']['custom_proxy_group'].forEach((vv, idx) => {
+    let params = vv.split('`');
+    let groupName = params[0], tp = params[1];
+    if (params[1] === 'url-test') {
+      let regex = params[2],
+        urlTest = String(params[3]) ? String(params[3]) : 'http://www.google.com/generate_204',
+        interval = Number(params[4]) ? Number(params[4]) : 300,
+        timeout = Number(params[5]) ? Number(params[5]) : 5000,
+        tolerance = Number(params[6]) ? Number(params[5]) : 50;
+      let validProxyNames = getProxyNames(proxyNames, [regex]);
+      proxyGroup.push({
+        name: groupName, type: 'url-test', url: urlTest, interval: interval, timeout: timeout, tolerance: tolerance, proxies: validProxyNames,
+      });
+    } else if (params[1] === 'select') {
+      let validProxyNames = getProxyNames(proxyNames, params.slice(2));
+      proxyGroup.push({
+        name: groupName, type: 'select', proxies: validProxyNames,
+      });
+    }
+  });
+
+  return {
+    'proxy-groups': proxyGroup,
+    'rules': rules,
+    'rule-providers': ruleProviders,
+  };
+}
+
+function parseVars(customObj, env) {
+  let vars = {
+    'provider_proxy': env.PROVIDER_PROXY,
+    'clash_rule': 'https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/',
+  }
+  if (!vars['provider_proxy']) {
+    vars['provider_proxy'] = 'https://ghproxy.org/';
+  }
+  if (customObj && customObj['var']) {
+    Object.assign(vars, customObj['var']);
+  }
+  return vars;
+}
+
+async function parseAll(subUrls, customerUrl, getResp, env) {
+  // parse custom url
+  let customObj = await parseCustom(customerUrl)
+  let vars = parseVars(customObj, env);
+  // get sub urls
+  if (customObj && customObj.custom && customObj.sub.url) {
+    let _url = customObj.sub.url;
+    if (_url instanceof Array) subUrls = _url;
+    else if (_url instanceof String) subUrls = [_url];
+  }
+
+  let proxies = {}, proxyNames = [], tot = 0;
+  let subUrlPromise = subUrls.map(url => parseSub(url))
+  let subObjs = await Promise.all(subUrlPromise)
+  // parse subscribe urls
+  let allConfigObj = {}, excludeSet = new Set(["proxy-groups", "rules", "rule-providers", "proxies"]);
+  subObjs.forEach(ret => {
+    let configObj = ret[0];
+    getResp(ret[1]);
+    Object.keys(configObj).forEach(kk => {
+      if (!excludeSet.has(kk)) {
+        allConfigObj[kk] = configObj[kk];
+      }
+    })
+    // collect all proxies, and rename it
+    configObj['proxies'].forEach(proxy => {
+      let proxyName = `${proxy.name} | ${tot}`;
+      ++tot;
+      proxy.name = proxyName;
+      proxies[proxyName] = proxy;
+      proxyNames.push(proxyName);
+    })
+  })
+  allConfigObj['proxies'] = proxies;
+
+  let rules = parseRules(customObj, proxyNames, vars)
+  Object.assign(allConfigObj, rules);
+  return allConfigObj;
+}
+
 export default {
   async fetch(request, env) {
     let { pathname, searchParams } = new URL(request.url);
 
-    if (!pathname.startsWith("/m/")) {
+    let configUrl = null;
+    let subUrls = [];
+    let customUrl = null;
+
+    if (pathname.startsWith("/m/")) {
+      configUrl = Base64.decode(pathname.slice(3));
+      subUrls.push(configUrl);
+      try {
+        customUrl = Base64.decode(searchParams.get('custom'))
+      } catch (e) {
+
+      }
+    } else if (pathname.startsWith("/p/")) {
+      customUrl = Base64.decode(pathname.slice(3));
+    } else {
       return new Response(`error: invalid parameter`, {
         headers: {
           "content-type": "text/plain",
         },
       });
     }
-    // get customer config
-    let customUrl = searchParams.get('custom');
-    let customObj = null;
-    // if custom config is not null
-    if (customUrl !== null && customUrl !== undefined) {
-      customUrl = Base64.decode(customUrl);
-      let ts = (new Date()).valueOf();
-      if (customUrl.indexOf('?') > 0) customUrl = `${customUrl}&ts=${ts}`
-      else customUrl = `${customUrl}?ts=${ts}`
-      let customIni = await fetchText(customUrl);
-      try {
-        customObj = parse(customIni, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
-      } catch (e) {
-        console.error(`failed to parse custom config: ${customUrl}`);
-      }
-    }
-    if (customObj === null || customObj === undefined) {
-      customObj = parse(template.defaultIniConfig, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
-    }
-    // get addition config
-    let additionUrl = searchParams.get("add");
-    let addObj = null;
-    if (additionUrl !== null && additionUrl !== undefined) {
-      additionUrl = Base64.decode(additionUrl);
-      let addIni = await fetchText(additionUrl);
-      addObj = parse(addIni, { keyMergeStrategy: KeyMergeStrategies.JOIN_TO_ARRAY });
-      // add ruleset and custom to front of custom config
-      if (addObj && addObj['custom']) {
-        if (addObj['custom']['ruleset']) {
-          customObj['custom']['ruleset'].unshift(...addObj['custom']['ruleset']);
-        }
-        if (addObj['custom']['custom_proxy_group']) {
-          customObj['custom']['custom_proxy_group'].unshift(...addObj['custom']['custom_proxy_group']);
-        }
-      }
-    }
 
-    // get raw config file
-    let configUrl = Base64.decode(pathname.slice(3));
     let resp = null;
-    let rawConfig = await fetchText(configUrl, (_resp) => resp = _resp);
+    let configObj = await parseAll(subUrls, customUrl, (_resp) => resp = resp == null ? _resp : resp, env);
+
     let respHeaders = {};
     resp.headers.forEach((vv, kk) => respHeaders[kk] = vv);
     respHeaders['content-type'] = 'text/plain;charset=utf-8';
     let removeHeaders = ['content-disposition', 'content-encoding']
     removeHeaders.forEach((kk) => delete respHeaders[kk]);
-    let configObj = yaml.load(rawConfig);
-
-    // remove
-    template.remove.forEach((key) => {
-      if (key in configObj) {
-        delete configObj[key];
-      }
-    });
-
-    // parse and get all proxy name
-    let proxyNames = [];
-    configObj["proxies"].forEach((proxyElem) => {
-      proxyNames.push(proxyElem["name"]);
-    });
-
-    let vars = {
-      'provider_proxy': env.PROVIDER_PROXY,
-      'clash_rule': 'https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/',
-    }
-    if (!vars['provider_proxy']) {
-      vars['provider_proxy'] = 'https://ghproxy.org/';
-    }
-    if (configObj['var']) {
-      Object.assign(vars, configObj['var']);
-    }
-    if (customObj && customObj['var']) {
-      Object.assign(vars, customObj['var']);
-    }
-    if (addObj && addObj['var']) {
-      Object.assign(vars, addObj['var']);
-    }
-    // parse and get rule providers and rules
-    let ruleProviders = {}, rules = [];
-    customObj["custom"]["ruleset"].forEach((rule, idx) => {
-      let split = rule.split(',')
-      if (split.length >= 2) {
-        let groupName = split[0];
-        let clashMatch = split[1].match("clash-((classical)|(ipcidr)|(domain)):")
-        if (clashMatch && clashMatch.length >= 2) {
-          let behavior = clashMatch[1];
-          let provideInterval = Number(split[2]) ? Number(split[2]) : 86400;
-          let provide = split[1].substring(split[1].indexOf(':') + 1);
-          let provideUrl = templateFormat(provide, vars);
-          let match = provideUrl.match(/([^/]*)\.[^.]*$/)
-          let provideName = provideUrl;
-          if (match.length >= 2) {
-            provideName = match[1];
-          } else if (match.length >= 1) {
-            provideName = match[0];
-          }
-          ruleProviders[provideName] = {
-            type: 'http', behavior, url: provideUrl, path: `./ruleset/${provideName}`, interval: provideInterval,
-          }
-          rules.push(`RULE-SET,${provideName},${groupName}`);
-        } else if (split[1] === '[]GEOIP') {
-          let target = split[2];
-          if (target !== undefined && target != null) {
-            rules.push(`GEOIP,${target},${groupName}`)
-          }
-        } else if (split[1] === '[]FINAL') {
-          rules.push(`MATCH,${groupName}`)
-        }
-      }
-    });
-
-    let proxyGroup = [];
-    customObj['custom']['custom_proxy_group'].forEach((vv, idx) => {
-      let params = vv.split('`');
-      let groupName = params[0], tp = params[1];
-      if (params[1] === 'url-test') {
-        let regex = params[2],
-          urlTest = String(params[3]) ? String(params[3]) : 'http://www.google.com/generate_204',
-          interval = Number(params[4]) ? Number(params[4]) : 300,
-          timeout = Number(params[5]) ? Number(params[5]) : 5000,
-          tolerance = Number(params[6]) ? Number(params[5]) : 50;
-        let validProxyNames = getProxyNames(proxyNames, [regex]);
-        proxyGroup.push({
-          name: groupName, type: 'url-test', url: urlTest, interval: interval, timeout: timeout, tolerance: tolerance, proxies: validProxyNames,
-        });
-      } else if (params[1] === 'select') {
-        let validProxyNames = getProxyNames(proxyNames, params.slice(2));
-        proxyGroup.push({
-          name: groupName, type: 'select', proxies: validProxyNames,
-        });
-      }
-    });
-
-    configObj['proxy-groups'] = proxyGroup;
-    configObj['rules'] = rules;
-    configObj['rule-providers'] = ruleProviders;
 
     let configStr = yaml.dump(configObj);
     return new Response(configStr, {
