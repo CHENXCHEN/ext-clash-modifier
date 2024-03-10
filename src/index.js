@@ -150,7 +150,7 @@ async function parseAll(subUrls, customerUrl, getResp, env) {
   let customObj = await parseCustom(customerUrl)
   let vars = parseVars(customObj, env);
   // get sub urls
-  if (customObj && customObj.custom && customObj.sub.url) {
+  if (customObj && customObj.sub && customObj.sub.url) {
     let _url = customObj.sub.url;
     if (_url instanceof Array) subUrls = _url;
     else if (_url instanceof String) subUrls = [_url];
