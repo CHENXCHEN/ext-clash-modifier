@@ -162,22 +162,24 @@ async function parseAll(subUrls, customerUrl, getResp, env) {
   // parse subscribe urls
   let allConfigObj = {}, excludeSet = new Set(["proxy-groups", "rules", "rule-providers", "proxies"]);
   subObjs.filter(x => x.status === 'fulfilled').forEach(res => {
-    let ret = res.value;
-    let configObj = ret[0];
-    getResp(ret[1]);
-    Object.keys(configObj).forEach(kk => {
-      if (!excludeSet.has(kk)) {
-        allConfigObj[kk] = configObj[kk];
-      }
-    })
-    // collect all proxies, and rename it
-    configObj['proxies'].forEach(proxy => {
-      let proxyName = `${proxy.name} | ${tot}`;
-      ++tot;
-      proxy.name = proxyName;
-      proxies[proxyName] = proxy;
-      proxyNames.push(proxyName);
-    })
+    try {
+      let ret = res.value;
+      let configObj = ret[0];
+      getResp(ret[1]);
+      Object.keys(configObj).forEach(kk => {
+        if (!excludeSet.has(kk)) {
+          allConfigObj[kk] = configObj[kk];
+        }
+      })
+      // collect all proxies, and rename it
+      configObj['proxies'].forEach(proxy => {
+        let proxyName = `${proxy.name} | ${tot}`;
+        ++tot;
+        proxy.name = proxyName;
+        proxies[proxyName] = proxy;
+        proxyNames.push(proxyName);
+      })
+    } catch (e) {}
   })
   allConfigObj['proxies'] = Object.values(proxies);
 
