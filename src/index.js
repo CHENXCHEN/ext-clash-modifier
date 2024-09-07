@@ -63,8 +63,12 @@ async function parseCustom(url) {
 
 async function parseSub(url) {
   let resp = null;
-  let rawConfig = await fetchText(url, (_resp) => resp = _resp);
-  return [yaml.load(rawConfig), resp];
+  try {
+    let rawConfig = await fetchText(url, (_resp) => resp = _resp);
+    return [yaml.load(rawConfig), resp];
+  } catch (e) {
+    return [];
+  }
 }
 
 function parseRules(customObj, proxyNames, vars) {
@@ -161,7 +165,7 @@ async function parseAll(subUrls, customerUrl, getResp, env) {
   let subObjs = await Promise.all(subUrlPromise)
   // parse subscribe urls
   let allConfigObj = {}, excludeSet = new Set(["proxy-groups", "rules", "rule-providers", "proxies"]);
-  subObjs.forEach(ret => {
+  subObjs.filter(ret => ret.length > 0).forEach(ret => {
     let configObj = ret[0];
     getResp(ret[1]);
     Object.keys(configObj).forEach(kk => {
