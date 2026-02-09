@@ -9,7 +9,7 @@ async function fetchText(url, getResp) {
     method: 'GET',
     headers: {
       // 如果没有 ua，对于某些产商，不会返回纯文本的 clash yaml 配置，而是会返回加密内容
-      'User-Agent': 'Clash',
+      'User-Agent': 'clashx/1.3.16',
     }
   });
   if (getResp !== null && getResp !== undefined) {
